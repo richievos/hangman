@@ -55,12 +55,30 @@ The APIs are documented with OpenAPI/Swagger and accessible at `http://localhost
 
 It's suggested to view the API you copy-paste that openapi schema to https://editor.swagger.io/.
 
+## Development
+
+Dependencies:
+
+* Java 14+
+* Maven (for building)
+* docker (for running)
+
 ## Launching
 
-How to start the Hangman application
----
+This app uses Dynamodb storage, so the easiest way to run it is boot the app and dependencies via `docker-compose`.
 
-1. Run `mvn clean install` to build your application
-1. Start application with `java -jar target/Hangman-1.0-SNAPSHOT.jar server config.yml`
-1. To check that your application is running enter url `http://localhost:8080`
+```
+# build the app
+$ mvn clean package
 
+# rebuild the app image
+$ docker-compose build
+
+# boot the app and all dependencies
+$ docker-compose up
+
+# hit the app (in a separate terminal)
+$ curl -i http://localhost:8080/v3/api-docs
+
+
+```
