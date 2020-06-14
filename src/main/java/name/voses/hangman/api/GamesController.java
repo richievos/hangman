@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import com.codahale.metrics.annotation.Timed;
+import com.devskiller.friendly_id.FriendlyId;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -72,15 +73,16 @@ public class GamesController {
         if (options.getMaxWrongGuesses() == null)
             options.setMaxWrongGuesses(defaultMaxWrongGuesses);
 
-        Game game = new Game(UUID.randomUUID().toString(),
+        String gameWord = randomWord();
+        Game game = new Game(FriendlyId.createFriendlyId(),
                              options.getMaxWrongGuesses(),
-                             randomWord(),
-                             PlayState.build(options.getMaxWrongGuesses(), new String[0], "carpool"));
+                             gameWord,
+                             PlayState.build(options.getMaxWrongGuesses(), new String[0], gameWord));
         gameStore.put(game.getId(), game);
         logJSON(Map.of("action", "gameCreate",
                        "id", game.getId(),
-                       "word", game.getWordBeingGuessed(),
-                       "maxWrongGuesses", game.getMaxWrongGuesses()));
+                       "data", Map.of("word", game.getWordBeingGuessed(),
+                                     "maxWrongGuesses", game.getMaxWrongGuesses())));
 
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
                                              .path("/{id}") // TODO: full path?
@@ -88,6 +90,22 @@ public class GamesController {
                                               .toUri();
 
         return ResponseEntity.created(uri).body(Map.of("game", game));
+    }
+
+    @GetMapping("{gameId}")
+    @Timed
+    @Operation(description = "Retrieve an existing game")
+    @ApiResponse(responseCode = "200", description = "Game retrieved",
+                 content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+                                    schema = @Schema(implementation = Game.class)))
+    @ApiResponse(responseCode = "404", description = "Game with given id not found")
+    public ResponseEntity<Map<String, Game>> getGame(@PathVariable String gameId) {
+        Game game = gameStore.get(gameId);
+        if (game == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(Map.of("game", game));
     }
 
     @PutMapping("{gameId}/guesses/{letter}")

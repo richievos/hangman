@@ -86,6 +86,22 @@ public class HangmanApplicationTests {
     }
 
     /******************************************
+     * Show Game
+     ******************************************/
+    @Test
+    public void retrievesExistingGame() throws Exception {
+        ResponseEntity<String> createResponse = postCreateGame(null);
+        assertEquals(201, createResponse.getStatusCodeValue());
+
+        Map<String, Object> createdGame = readGame(createResponse);
+
+        ResponseEntity<String> showGameResponse = getGame((String) createdGame.get("id"));
+        assertEquals(200, showGameResponse.getStatusCodeValue());
+        Map<String, Object> showedGame = readGame(showGameResponse);
+        assertEquals(createdGame.get("id"), showedGame.get("id"));
+    }
+
+    /******************************************
      * Guessing tests
      ******************************************/
     @Test
@@ -120,9 +136,10 @@ public class HangmanApplicationTests {
         Map<String, Object> game = readGame(createResponse);
 
         // Word is "abruptly" (TODO: stub that versus relying on the config)
-        ResponseEntity<String> badGuessResponse = registerGuess((String) game.get("id"), "a");
-        assertEquals(200, badGuessResponse.getStatusCodeValue());
-        game = readGame(badGuessResponse);
+        ResponseEntity<String> guessResponse = registerGuess((String) game.get("id"), "a");
+        assertEquals(200, guessResponse.getStatusCodeValue());
+        game = readGame(guessResponse);
+
         Map<String, Object> playState = (Map<String, Object>) game.get("playState");
         assertEquals(3, playState.get("remainingWrongGuesses"));
         List<String> letters = getLetters(playState);
@@ -179,13 +196,18 @@ public class HangmanApplicationTests {
         return response;
     }
 
+    private ResponseEntity<String> getGame(String gameId) throws UnsupportedEncodingException {
+        ResponseEntity<String> response =
+            this.restTemplate.exchange("http://localhost:" + port + "/games/" + gameId,
+                                       HttpMethod.GET,
+                                       null,
+                                       String.class);
+
+        return response;
+    }
+
     private ResponseEntity<String> registerGuess(String gameId, String guess) throws UnsupportedEncodingException {
         ResponseEntity<String> response =
-            // this.restTemplate.exchange("http://localhost:" + port + "/games/{gameId}/guesses/{letter}",
-            //                             HttpMethod.PUT,
-            //                             null,
-            //                             String.class,
-            //                             Map.of("gameId", gameId, "letter", guess));
             this.restTemplate.exchange("http://localhost:" + port + "/games/" + gameId + "/guesses/" + guess,
                                        HttpMethod.PUT,
                                        null,
