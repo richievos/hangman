@@ -1,0 +1,14 @@
+games:
+    defaultMaxWrongGuesses: 10
+    possibleWords:
+    - "abruptly"
+
+logging:
+    # pattern:
+    #     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+    file: logs/application-debug.log
+    level:
+        root: INFO
+        org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
+        name.voses: DEBUG
