@@ -10,8 +10,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import name.voses.hangman.resources.GuessResult.GuessResultState;
 
@@ -77,19 +75,16 @@ public class PlayState {
         this.codePointToWordLocations = codePointToWordLocations;
     }
 
-    @JsonProperty
     @Schema(description = "How many more wrong guesses before the game would be failed")
     public int getRemainingWrongGuesses() {
         return this.remainingWrongGuesses;
     }
 
-    @JsonProperty
     @Schema(description = "The actual word being guessed, with placeholders for letters that have not yet been guessed")
     public List<LetterState> getMaskedWord() {
         return this.maskedWord;
     }
 
-    @JsonProperty
     @Schema(description = "An array of the letters which were guessed (possibly unicode)")
     public List<LetterState> getMissedGuesses() {
         return this.missedGuesses;

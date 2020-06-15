@@ -1,8 +1,6 @@
 package name.voses.hangman.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "Information about a game")
@@ -23,22 +21,24 @@ public class Game {
         this.wordBeingGuessed = wordBeingGuessed;
     }
 
-    @JsonProperty
     @Schema(description = "id used for interacting with the game")
     public String getId() {
         return this.id;
     }
 
-    @JsonProperty
     @Schema(description = "The maximum number of guesses allowed before the game is considered lost")
     public int getMaxWrongGuesses() {
         return this.maxWrongGuesses;
     }
 
-    @JsonProperty
     @Schema(description = "The state of the game, including information on the word itself")
     public PlayState getPlayState() {
         return this.playState;
+    }
+
+    @Schema(description = "How long the word being guessed is")
+    public int getWordLength() {
+        return this.wordBeingGuessed.length();
     }
 
     @JsonIgnore

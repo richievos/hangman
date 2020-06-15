@@ -73,6 +73,8 @@ public class HangmanApplicationTests {
         assertNotNull(playState);
         assertEquals(new ArrayList<Object>(), playState.get("missedGuesses"));
         assertEquals(5, playState.get("remainingWrongGuesses"));
+
+        assertEquals(game.get("wordLength"), ((List<Object>) playState.get("maskedWord")).size());
     }
 
     @Test

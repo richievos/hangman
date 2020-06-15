@@ -39,7 +39,7 @@ import name.voses.hangman.resources.PlayState;
 
 @RestController
 @RequestMapping(path = "/games")
-@OpenAPIDefinition(info = @Info(title = "Game endpoints", version = "1"))
+@OpenAPIDefinition(info = @Info(title = "Hangman Game endpoints", version = "1"))
 @ConfigurationProperties(prefix="games")
 public class GamesController {
     private static class GameCreateOptions {
@@ -98,7 +98,8 @@ public class GamesController {
     @ApiResponse(responseCode = "200", description = "Game retrieved",
                  content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                                     schema = @Schema(implementation = Game.class)))
-    @ApiResponse(responseCode = "404", description = "Game with given id not found")
+    @ApiResponse(responseCode = "404", description = "Game with given id not found",
+                 content = @Content())
     public ResponseEntity<Map<String, Game>> getGame(@PathVariable String gameId) {
         Game game = gameStore.get(gameId);
         if (game == null) {
@@ -114,8 +115,10 @@ public class GamesController {
     @ApiResponse(responseCode = "200", description = "Guess registered, returns the updated game. Idempotent on a re-guess of a letter.",
                  content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                                     schema = @Schema(implementation = Game.class)))
-    @ApiResponse(responseCode = "404", description = "Game with given id not found")
-    @ApiResponse(responseCode = "400", description = "Max wrong guesses already performed or invalid letter")
+    @ApiResponse(responseCode = "404", description = "Game with given id not found",
+                 content = @Content())
+    @ApiResponse(responseCode = "400", description = "Max wrong guesses already performed or invalid letter",
+                 content = @Content())
     public ResponseEntity<Map<String, Game>> guessLetter(
                                     @PathVariable("gameId")
                                     String gameId,
