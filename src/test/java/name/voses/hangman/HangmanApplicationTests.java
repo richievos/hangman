@@ -11,13 +11,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,12 +34,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import name.voses.hangman.persistence.GameInfoDynamoDBManagement;
+
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @SuppressWarnings("unchecked")
 public class HangmanApplicationTests {
-    // private static final String CONFIG_PATH =
-    // ResourceHelpers.resourceFilePath("test-example.yml");
-
     @LocalServerPort
     private int port;
 
@@ -44,16 +47,26 @@ public class HangmanApplicationTests {
 
     private static HttpHeaders headers;
 
-
-    // public static final DropwizardAppExtension<HangmanConfiguration> RULE =
-    // new DropwizardAppExtension<>(
-    // HangmanApplication.class, CONFIG_PATH);
-
     @BeforeAll
     public static void runBeforeAllTestMethods() {
         headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
     }
+
+    /******************************************
+     * DB Setup
+     /******************************************/
+    @Autowired
+	private AmazonDynamoDB amazonDynamoDB;
+
+	@Autowired
+	private DynamoDBMapper mapper;
+
+    @BeforeEach
+    public void setupDB() throws Exception { GameInfoDynamoDBManagement.initDB(amazonDynamoDB, mapper); }
+
+    @AfterEach
+    public void tearDownDB() throws Exception { GameInfoDynamoDBManagement.tearDownDB(amazonDynamoDB, mapper); }
 
     /******************************************
      * Basic create tests
@@ -158,7 +171,24 @@ public class HangmanApplicationTests {
         ResponseEntity<String> badGuessResponse = registerGuess((String) game.get("id"), "☃");
         assertEquals(200, badGuessResponse.getStatusCodeValue());
 
-        badGuessResponse = registerGuess((String) game.get("id"), "👍");
+        badGuessResponse = registerGuess((String) game.get("id"), "☣");
+        assertEquals(400, badGuessResponse.getStatusCodeValue());
+    }
+
+    @Test
+    public void gamesDontAllowMoreGuessesAfterWon() throws Exception {
+        ResponseEntity<String> createResponse = postCreateGame(1);
+        Map<String, Object> game = readGame(createResponse);
+
+        String word = "abruptly";
+
+        // word.
+        for (int i = 0; i < word.length(); i++) {
+            ResponseEntity<String> goodGuessResponse = registerGuess((String) game.get("id"), word.substring(i, i+1));
+            assertEquals(200, goodGuessResponse.getStatusCodeValue());
+        }
+
+        ResponseEntity<String> badGuessResponse = registerGuess((String) game.get("id"), "☣");
         assertEquals(400, badGuessResponse.getStatusCodeValue());
     }
 
@@ -171,7 +201,7 @@ public class HangmanApplicationTests {
             // Using random unicode chars to avoid having to stub the string (currently the
             // words don't include unicode)
             ResponseEntity<String> badGuessResponse = registerGuess((String) game.get("id"), "☃");
-            assertEquals(200, badGuessResponse.getStatusCodeValue());
+            assertEquals(200, badGuessResponse.getStatusCodeValue(), "status for " + i);
             game = readGame(badGuessResponse);
 
             Map<String, Object> playState = (Map<String, Object>) game.get("playState");

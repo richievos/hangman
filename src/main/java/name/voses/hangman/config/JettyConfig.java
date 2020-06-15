@@ -1,4 +1,4 @@
-package name.voses.hangman;
+package name.voses.hangman.config;
 
 import org.springframework.boot.web.embedded.jetty.JettyServletWebServerFactory;
 import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;

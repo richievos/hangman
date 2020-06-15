@@ -40,6 +40,15 @@ Game
         created_at
         letter
 
+Implementation of that in Dynamo (usage is not a real column)
+
+| usage | partition key    | sort key                     | word_data | created_at |
+| ---   | ---              | ---                          | ---       | ---        |
+| game  | game#{game_id}   | game#{timestamp}             | {word}    | iso8601    |
+| guess | game#{game_id}   | guess#{timestamp}#{letter}   | {letter}  | iso8601    |
+
+A future extension would be to add a `ttl` column that's an int of (`created_at + delta`) which would auto delete old games [via a TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html). It's likely old games aren't useful after a couple hours (minutes?) and that'd save costs.
+
 ## API Notes
 
 * when talking about characters, the API returns strings. JSON doesn't have a char type, so single length strings are returned. This also helps avoid unicode issues (some letters are multiple characters)
@@ -79,6 +88,17 @@ $ docker-compose up
 
 # hit the app (in a separate terminal)
 $ curl -i http://localhost:8080/v3/api-docs
+```
 
+Running tests
 
+```
+# build the app
+$ mvn clean package
+
+# boot the local dynamo instance
+$ docker-compose up dynamodb-test
+
+# hit the app (in a separate terminal)
+$ mvn test
 ```

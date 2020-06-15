@@ -1,18 +1,27 @@
 version: '2'
 services:
-  dynamodb:
+  dynamodb-dev:
     image: amazon/dynamodb-local:latest
     ports:
       - "8000:8000"
     command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
     networks:
-      - backend
+      - backend-dev
+
+  dynamodb-test:
+    image: amazon/dynamodb-local:latest
+    ports:
+      - "8001:8000"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    networks:
+      - backend-test
 
   hangman-app:
     build: .
     ports:
       - "8080:8080"
     networks:
-      - backend
+      - backend-dev
 networks:
-  backend:
+  backend-dev:
+  backend-test:

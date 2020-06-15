@@ -1,55 +1,69 @@
 package name.voses.hangman.resources;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import name.voses.hangman.resources.GuessResult.GuessResultState;
 
 @Schema(description = "The state of the game being played including information about guesses")
 public class PlayState {
+    public static enum GuessIneligibleReason {
+        TOO_MANY_WRONG_GUESSES,
+        REPEAT,
+        ALREADY_WON
+    }
+
     private int remainingWrongGuesses;
     private List<LetterState> maskedWord;
     private List<LetterState> missedGuesses;
-    private Map<Integer, List<Integer>> codePointToWordLocations;
 
     public static PlayState build(int maxWrongGuesses, String[] guesses, String wordBeingGuessed) {
         Set<Integer> guessLetterCodePoints = Arrays.stream(guesses)
                                                     .map(s -> s.codePointAt(0))
-                                                    .collect(Collectors.toCollection(TreeSet::new));
-        Set<Integer> missedGuesses = new TreeSet<>(guessLetterCodePoints);
+                                                    // LinkedHashSet to ensure order is kept
+                                                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        LinkedHashSet<Integer> missedGuesses = new LinkedHashSet<Integer>();
 
-        List<LetterState> maskedWord = new ArrayList<>(wordBeingGuessed.length());
+        LetterState[] maskedWord = new LetterState[wordBeingGuessed.length()];
+        Arrays.fill(maskedWord, LetterState.EMPTY_STATE);
 
-        Map<Integer, List<Integer>> codePointToWordLocations = new HashMap<>();
+        Map<Integer, List<Integer>> codePointToWordLocations = new HashMap<>(wordBeingGuessed.length());
 
         for (int i = 0; i < wordBeingGuessed.length(); i++) {
             int codePoint = wordBeingGuessed.codePointAt(i);
 
             List<Integer> locations = codePointToWordLocations.get(codePoint);
             if (locations == null) {
+                // LinkedList gives O(1) insert and we only ever sequentially access the list
                 locations = new LinkedList<>();
                 codePointToWordLocations.put(codePoint, locations);
             }
             locations.add(i);
+        }
 
-            if (guessLetterCodePoints.contains(codePoint)) {
-                maskedWord.add(new LetterState(codePointToString(codePoint)));
-                missedGuesses.remove(codePoint);
+        for (Integer guess : guessLetterCodePoints) {
+            List<Integer> locations = codePointToWordLocations.get(guess);
+            if (locations != null) {
+                final LetterState guessLetterState = LetterState.fromCodePoint(guess);
+                locations.forEach((location) -> maskedWord[location] = guessLetterState);
             } else {
-                maskedWord.add(new LetterState());
+                missedGuesses.add(guess);
+            }
+
+            // account for us getting into a state of:
+            // word = "abcd"
+            // guesses = ["a", "b", "c", <too many bad guesses>, "d" ]
+            if (missedGuesses.size() >= maxWrongGuesses) {
+                break;
             }
         }
 
-        // NOTE: it's possible that remainingWrongGuesses could be negative, if we allowed decreasing
-        // the max miss count after guesses have been registered
         int remainingWrongGuesses = maxWrongGuesses - missedGuesses.size();
         List<LetterState> missedGuessLetterStates =
                                 missedGuesses.stream()
@@ -57,7 +71,7 @@ public class PlayState {
                                               .map(LetterState::new)
                                               .collect(Collectors.toList());
 
-        return new PlayState(remainingWrongGuesses, missedGuessLetterStates, maskedWord, codePointToWordLocations);
+        return new PlayState(remainingWrongGuesses, missedGuessLetterStates, Arrays.asList(maskedWord));
     }
 
     private static boolean includesLetter(final List<LetterState> letters, final String letter) {
@@ -68,11 +82,10 @@ public class PlayState {
         return new String(new int[] { codePoint }, 0, 1);
     }
 
-    public PlayState(int remainingWrongGuesses, List<LetterState> missedGuesses, List<LetterState> maskedWord, Map<Integer, List<Integer>> codePointToWordLocations) {
+    public PlayState(int remainingWrongGuesses, List<LetterState> missedGuesses, List<LetterState> maskedWord) {
         this.remainingWrongGuesses = remainingWrongGuesses;
         this.missedGuesses = missedGuesses;
         this.maskedWord = maskedWord;
-        this.codePointToWordLocations = codePointToWordLocations;
     }
 
     @Schema(description = "How many more wrong guesses before the game would be failed")
@@ -90,46 +103,23 @@ public class PlayState {
         return this.missedGuesses;
     }
 
-    public GuessResult recordGuess(String guessedLetter) {
+    public GuessIneligibleReason ineligibleToGuessReason(String guessedLetter) {
+        // TODO: if desired we could have the guessed letters stored in a set to speed up this check
         boolean alreadyGuessed = includesLetter(maskedWord, guessedLetter) ||
                                     includesLetter(missedGuesses, guessedLetter);
+
         if (alreadyGuessed) {
-            return new GuessResult(GuessResultState.REPEAT, this);
+            return GuessIneligibleReason.REPEAT;
         } else if (remainingWrongGuesses < 1) {
-            return new GuessResult(GuessResultState.TOO_MANY_WRONG_GUESSES, this);
+            return GuessIneligibleReason.TOO_MANY_WRONG_GUESSES;
+        } else if (isGameWon()) {
+            return GuessIneligibleReason.ALREADY_WON;
         }
 
-        int codePoint = guessedLetter.codePointAt(0);
-        List<Integer> codePointLocations = this.codePointToWordLocations.get(codePoint);
-        if (codePointLocations == null) {
-            return new GuessResult(GuessResultState.MISS,
-                                   cloneWithExtraMiss(guessedLetter));
-        } else {
-            return new GuessResult(GuessResultState.MATCH,
-                                   cloneWithHitFilledIn(guessedLetter, codePointLocations));
-        }
+        return null;
     }
 
-    private PlayState cloneWithExtraMiss(String newMiss) {
-        List<LetterState> newMissedGuesses = new ArrayList<>(missedGuesses);
-        newMissedGuesses.add(new LetterState(newMiss));
-
-        return new PlayState(remainingWrongGuesses - 1,
-                             newMissedGuesses,
-                             maskedWord,
-                             codePointToWordLocations);
-
-    }
-
-    private PlayState cloneWithHitFilledIn(String letter, List<Integer> codePointLocations) {
-        List<LetterState> newMaskedWord = new ArrayList<>(this.maskedWord);
-        for (int index : codePointLocations) {
-            newMaskedWord.set(index, new LetterState(letter));
-        }
-
-        return new PlayState(remainingWrongGuesses,
-                             missedGuesses,
-                             newMaskedWord,
-                             codePointToWordLocations);
+    private boolean isGameWon() {
+        return this.getMaskedWord().stream().allMatch(LetterState::isFilled);
     }
 }

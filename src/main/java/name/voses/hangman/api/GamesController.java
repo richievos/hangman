@@ -1,21 +1,16 @@
 package name.voses.hangman.api;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ThreadLocalRandom;
 
 import com.codahale.metrics.annotation.Timed;
-import com.devskiller.friendly_id.FriendlyId;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,14 +28,13 @@ import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import name.voses.hangman.persistence.GameInfoService;
 import name.voses.hangman.resources.Game;
-import name.voses.hangman.resources.GuessResult;
-import name.voses.hangman.resources.PlayState;
+import name.voses.hangman.resources.PlayState.GuessIneligibleReason;
 
 @RestController
 @RequestMapping(path = "/games")
 @OpenAPIDefinition(info = @Info(title = "Hangman Game endpoints", version = "1"))
-@ConfigurationProperties(prefix="games")
 public class GamesController {
     private static class GameCreateOptions {
         @Schema(description = "How many wrong guesses to allow", required = false)
@@ -50,17 +44,13 @@ public class GamesController {
         public void setMaxWrongGuesses(Integer maxWrongGuesses) { this.maxWrongGuesses = maxWrongGuesses; }
     }
 
-    private static Map<String, Game> gameStore = new HashMap<>();
+    @Autowired
+    private GameInfoService gameInfoService;
 
     private static Logger LOG = LoggerFactory.getLogger(GamesController.class);
 
     @Value("${games.defaultMaxWrongGuesses}")
     private int defaultMaxWrongGuesses;
-
-    // TODO: it's unclear if there's a way to do this sort of loading of a list
-    //       config var, so instead currently using @ConfigurationProperties
-    private List<String> possibleWords = new ArrayList<>();
-    public List<String> getPossibleWords() { return this.possibleWords; }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Timed
@@ -73,16 +63,12 @@ public class GamesController {
         if (options.getMaxWrongGuesses() == null)
             options.setMaxWrongGuesses(defaultMaxWrongGuesses);
 
-        String gameWord = randomWord();
-        Game game = new Game(FriendlyId.createFriendlyId(),
-                             options.getMaxWrongGuesses(),
-                             gameWord,
-                             PlayState.build(options.getMaxWrongGuesses(), new String[0], gameWord));
-        gameStore.put(game.getId(), game);
+        Game game = gameInfoService.createGame(options.getMaxWrongGuesses());
+
         logJSON(Map.of("action", "gameCreate",
                        "id", game.getId(),
                        "data", Map.of("word", game.getWordBeingGuessed(),
-                                     "maxWrongGuesses", game.getMaxWrongGuesses())));
+                       "maxWrongGuesses", game.getMaxWrongGuesses())));
 
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
                                              .path("/{id}") // TODO: full path?
@@ -101,7 +87,7 @@ public class GamesController {
     @ApiResponse(responseCode = "404", description = "Game with given id not found",
                  content = @Content())
     public ResponseEntity<Map<String, Game>> getGame(@PathVariable String gameId) {
-        Game game = gameStore.get(gameId);
+        Game game = gameInfoService.findGameWithGuesses(gameId);
         if (game == null) {
             return ResponseEntity.notFound().build();
         }
@@ -112,12 +98,12 @@ public class GamesController {
     @PutMapping("{gameId}/guesses/{letter}")
     @Timed
     @Operation(description = "Guess a letter")
-    @ApiResponse(responseCode = "200", description = "Guess registered, returns the updated game. Idempotent on a re-guess of a letter.",
+    @ApiResponse(responseCode = "200", description = "Guess registered, returns the current (updated) state of the game. Idempotent on a re-guess of a letter.",
                  content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
                                     schema = @Schema(implementation = Game.class)))
     @ApiResponse(responseCode = "404", description = "Game with given id not found",
                  content = @Content())
-    @ApiResponse(responseCode = "400", description = "Max wrong guesses already performed or invalid letter",
+    @ApiResponse(responseCode = "400", description = "Game finished or invalid letter",
                  content = @Content())
     public ResponseEntity<Map<String, Game>> guessLetter(
                                     @PathVariable("gameId")
@@ -133,13 +119,42 @@ public class GamesController {
             return ResponseEntity.badRequest().build();
         }
 
-        Game game = gameStore.get(gameId);
+        Game game = gameInfoService.findGameWithGuesses(gameId);
         if (game == null) {
             return ResponseEntity.notFound().build();
         }
 
-        GuessResult guessResult = game.recordGuess(letter);
-        game.setPlayState(guessResult.getPlayState());
+
+        // To avoid having to lock the game record (while still avoiding race conditions) this code:
+        // 1. checks if the current guess is eligible to play at all, if not fail fast
+        // 2. stores the new guess
+        // 3. reloads the game and its guesses
+        // 4. returns the new state of the game
+        //
+        // This avoids having to do any locks, but does mean the data loading logic needs to
+        // account for duplicate guesses being registered and possibly more guesses having
+        // occurred then the game was expected to allow.
+        //
+        // As currently designed this means we can't tell the player if they got a hit or a miss,
+        // however that could be straightforwardly done just by passing an ID along with the
+        // letter we store, and comparing after the data is reloaded.
+
+        // exit early if the game has already ended
+        GuessIneligibleReason ineligibleReason = game.ineligibleToGuessReason(letter);
+        if (ineligibleReason != null) {
+            logGuessResult(gameId, letter, "ineligible_reason", Map.of("ineligibleToGuessReason", ineligibleReason.name()));
+        }
+
+        if (ineligibleReason == null) {
+            // store that guess and reload to see where we ended up
+            logGuessResult(gameId, letter, "recording_guess", Map.of("word", game.getWordBeingGuessed()));
+            gameInfoService.storeGuess(game, letter);
+            game = gameInfoService.findGameWithGuesses(gameId);
+        } else if (ineligibleReason == GuessIneligibleReason.REPEAT) {
+            // no-op, just act idempotently
+        } else {
+            return ResponseEntity.badRequest().build();
+        }
 
         return ResponseEntity.ok(Map.of("game", game));
     }
@@ -154,10 +169,5 @@ public class GamesController {
 
     private void logJSON(Map<?, ?> message) throws JsonProcessingException {
         LOG.info(new ObjectMapper().writeValueAsString(message));
-    }
-
-    private String randomWord() {
-        int randomElementIndex = ThreadLocalRandom.current().nextInt(possibleWords.size());
-        return possibleWords.get(randomElementIndex);
     }
 }

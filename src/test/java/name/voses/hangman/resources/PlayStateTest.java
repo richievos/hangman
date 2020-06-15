@@ -11,8 +11,6 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
-import name.voses.hangman.resources.GuessResult.GuessResultState;
-
 public class PlayStateTest {
     @Test
     public void testBuildWithNoGuesses() {
@@ -47,18 +45,14 @@ public class PlayStateTest {
     }
 
     @Test
-    public void testMasksAllNewHitsOnGuess() {
-        PlayState state = PlayState.build(10, new String[] { "m" }, "mywordmy");
+    public void testStopsAfterEnoughWrongGuesses() {
+        PlayState state = PlayState.build(1, new String[] { "m", "z", "o" }, "mywordmy");
 
-        assertIterableEquals(Collections.EMPTY_LIST, state.getMissedGuesses());
-        assertEquals(10, state.getRemainingWrongGuesses());
+        assertIterableEquals(List.of("z"), getLetters(state.getMissedGuesses()));
+        assertEquals(0, state.getRemainingWrongGuesses());
 
-        GuessResult guessResult = state.recordGuess("o");
-        assertEquals(GuessResultState.MATCH, guessResult.getResultState());
-
-        state = guessResult.getPlayState();
         List<String> maskedWordLetters = getLetters(state.getMaskedWord());
-        assertIterableEquals(asList("m", null, null, "o", null, null, "m", null),
+        assertIterableEquals(asList("m", null, null, null, null, null, "m", null),
                              maskedWordLetters);
     }
 

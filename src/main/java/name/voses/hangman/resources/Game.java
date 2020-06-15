@@ -2,6 +2,7 @@ package name.voses.hangman.resources;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import name.voses.hangman.resources.PlayState.GuessIneligibleReason;
 
 @Schema(description = "Information about a game")
 public class Game {
@@ -46,11 +47,11 @@ public class Game {
         return this.wordBeingGuessed;
     }
 
-    public GuessResult recordGuess(String letter) {
-        return playState.recordGuess(letter);
-    }
-
 	public void setPlayState(PlayState playState) {
         this.playState = playState;
+	}
+
+	public GuessIneligibleReason ineligibleToGuessReason(String letter) {
+		return getPlayState().ineligibleToGuessReason(letter);
 	}
 }

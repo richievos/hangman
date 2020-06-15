@@ -12,3 +12,10 @@ logging:
         root: INFO
         org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
         name.voses: DEBUG
+
+amazon:
+    # docs say to use us-west-2 for localhost https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CodeSamples.Java.html#CodeSamples.Java.RegionAndEndpoint
+    dynamodb.region: us-west-2
+    dynamodb.endpoint: http://localhost:8001/
+    aws.accesskey: key
+    aws.secretkey: key2
