@@ -11,9 +11,10 @@ import com.amazonaws.services.dynamodbv2.datamodeling.DynamoDBTable;
 
 import org.springframework.data.annotation.Id;
 
-// @Data
 @DynamoDBTable(tableName = "GameInfo")
 public class GameInfo {
+    // Composite key for the id
+    // https://github.com/derjust/spring-data-dynamodb/wiki/Use-Hash-Range-keys
     public static class GameInfoId implements Serializable {
         private static final long serialVersionUID = 1L;
 
@@ -45,13 +46,15 @@ public class GameInfo {
 
     private Integer guessCountData;
 
-    @Id GameInfoId gameInfoId;
+    @Id
+    private GameInfoId gameInfoId;
 
     public void makeGame(String gameId, Date createdAt, String word, int maxWrongGuesses) {
         this.setGameId(gameId);
-        this.setSK("game");
+        this.setSK("game#{" + createdAt.getTime() + "}");
         this.wordData = word;
         this.guessCountData = maxWrongGuesses;
+        this.createdAt = createdAt;
     }
 
     public void makeGuess(String gameId, Date createdAt, String letter) {
@@ -65,7 +68,7 @@ public class GameInfo {
     @DynamoDBIgnore
     public boolean isGame() {
         String sk = getSK();
-        return sk != null && sk.equals("game");
+        return sk != null && sk.startsWith("game");
     }
 
     @DynamoDBAttribute(attributeName = "word_data")

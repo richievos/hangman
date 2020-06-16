@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import com.codahale.metrics.annotation.Timed;
 import com.devskiller.friendly_id.FriendlyId;
 
 import org.springframework.beans.factory.annotation.Autowired;

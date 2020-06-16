@@ -1,1 +1,196 @@
-{"openapi":"3.0.1","info":{"title":"Game endpoints","version":"1"},"servers":[{"url":"http://localhost:8080","description":"Generated server url"}],"paths":{"/games":{"post":{"tags":["games-controller"],"description":"Start a new game","operationId":"createGame","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/GameCreateOptions"}}}},"responses":{"201":{"description":"New game created","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Game"}}}}}}},"/games/{gameId}/guesses/{letter}":{"put":{"tags":["games-controller"],"description":"Guess a letter","operationId":"guessLetter","parameters":[{"name":"gameId","in":"path","required":true,"schema":{"type":"string"}},{"name":"letter","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"400":{"description":"Max guesses already performed or invalid letter","content":{"*/*":{"schema":{"type":"object","additionalProperties":{"$ref":"#/components/schemas/Game"}}}}},"200":{"description":"Guess registered, returns the updated game. Idempotent on a re-guess of a letter.","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Game"}}}},"404":{"description":"Game with given id not found","content":{"*/*":{"schema":{"type":"object","additionalProperties":{"$ref":"#/components/schemas/Game"}}}}}}}}},"components":{"schemas":{"GameCreateOptions":{"type":"object","properties":{"maxWrongGuesses":{"type":"integer","description":"How many guesses to allow","format":"int32"}}},"Game":{"type":"object","properties":{"id":{"type":"string","description":"id used for interacting with the game"},"getmaxWrongGuesses":{"type":"integer","description":"The maximum number of guesses allowed before the game is considered lost","format":"int32"},"playState":{"$ref":"#/components/schemas/PlayState"}},"description":"Information about a game"},"LetterState":{"type":"object","properties":{"letter":{"type":"string","description":"The letter that was guessed. This may be unicode, and will be null for a 'placeholder' letter"}},"description":"Information about a guessed or not yet guessed letter in the game"},"PlayState":{"type":"object","properties":{"remainingWrongGuesses":{"type":"integer","description":"How many more wrong guesses before the game would be failed","format":"int32"},"maskedWord":{"type":"array","description":"The actual word being guessed, with placeholders for letters that have not yet been guessed","items":{"$ref":"#/components/schemas/LetterState"}},"missedGuesses":{"type":"array","description":"An array of the letters which were guessed (possibly unicode)","items":{"$ref":"#/components/schemas/LetterState"}}},"description":"The state of the game being played including information about guesses"}}}}
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Hangman Game endpoints",
+    "version": "1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "paths": {
+    "/games/{gameId}": {
+      "get": {
+        "tags": [
+          "games-controller"
+        ],
+        "description": "Retrieve an existing game",
+        "operationId": "getGame",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Game retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Game with given id not found"
+          }
+        }
+      }
+    },
+    "/games/{gameId}/guesses/{letter}": {
+      "put": {
+        "tags": [
+          "games-controller"
+        ],
+        "description": "Guess a letter",
+        "operationId": "guessLetter",
+        "parameters": [
+          {
+            "name": "gameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "letter",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Guess registered, returns the current (updated) state of the game. Idempotent on a re-guess of a letter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Game finished or invalid letter"
+          },
+          "404": {
+            "description": "Game with given id not found"
+          }
+        }
+      }
+    },
+    "/games": {
+      "post": {
+        "tags": [
+          "games-controller"
+        ],
+        "description": "Start a new game",
+        "operationId": "createGame",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreateOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New game created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Game": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "id used for interacting with the game"
+          },
+          "maxWrongGuesses": {
+            "type": "integer",
+            "description": "The maximum number of guesses allowed before the game is considered lost",
+            "format": "int32"
+          },
+          "playState": {
+            "$ref": "#/components/schemas/PlayState"
+          },
+          "wordLength": {
+            "type": "integer",
+            "description": "How long the word being guessed is",
+            "format": "int32"
+          }
+        },
+        "description": "Information about a game"
+      },
+      "LetterState": {
+        "type": "object",
+        "properties": {
+          "letter": {
+            "type": "string",
+            "description": "The letter that was guessed. This may be unicode, and will be null for a 'placeholder' letter"
+          }
+        },
+        "description": "Information about a guessed or not yet guessed letter in the game"
+      },
+      "PlayState": {
+        "type": "object",
+        "properties": {
+          "remainingWrongGuesses": {
+            "type": "integer",
+            "description": "How many more wrong guesses before the game would be failed",
+            "format": "int32"
+          },
+          "maskedWord": {
+            "type": "array",
+            "description": "The actual word being guessed, with placeholders for letters that have not yet been guessed",
+            "items": {
+              "$ref": "#/components/schemas/LetterState"
+            }
+          },
+          "missedGuesses": {
+            "type": "array",
+            "description": "An array of the letters which were guessed (possibly unicode)",
+            "items": {
+              "$ref": "#/components/schemas/LetterState"
+            }
+          }
+        },
+        "description": "The state of the game being played including information about guesses"
+      },
+      "GameCreateOptions": {
+        "type": "object",
+        "properties": {
+          "maxWrongGuesses": {
+            "type": "integer",
+            "description": "How many wrong guesses to allow",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  }
+}

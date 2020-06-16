@@ -2,17 +2,27 @@
 
 This implements an API for a variant of the [Hangman game](https://en.wikipedia.org/wiki/Hangman_(game)).
 
+## Implementation Notes
+
+Generally this is less about the game, and more about experimentation in implementing this system. In particular this implementation:
+
+* is built on the latest Spring Boot (Lovelace-SR18)
+* persists into Dynamodb
+* is tested via junit5
+* manages instances via Docker/docker-compose
+* uses a lock-less data storage/management implementation
+
 ## Requirement Notes
 
-In the interests of time, the current design of this system has the following simplifications:
+In the interests of time, the current design of this system has the following idiosyncracies:
 
-* word list is a static configuration, versus being pulled from a data store
-* who performed any given operation is not stored (no audit logging, no caller tracking)
+* the word list is a static configuration, versus being pulled from a data store
+* no user management / audit logging / client tracking for who is using a game
 * no client id requirements nor tracking
 * no rate limiting
 * no logging or metric tie-ins (though the endpoints will generate metrics if that was plugged in)
 * failure cases of the API are not documented (400s / 500s)
-* repeated guesses of the same letter are ignored. A letter submission is idempotent since that's usually how the game would be played, and it simplifies client-server interactions around retries and failure cases.
+* repeated guesses of the same letter are ignored (intentionally). A letter submission is idempotent since that's usually how the game would be played, and it simplifies client-server interactions around retries and failure cases.
 
 ### Future Extension Notes
 
@@ -40,12 +50,15 @@ Game
         created_at
         letter
 
-Implementation of that in Dynamo (usage is not a real column)
+The Dynamodb data model implementing that follows. It distributes the data using the random gameId across partitions. It keeps all the data for a given game on the same partition, so it can all be loaded at once. Following Dynanmo
 
-| usage | partition key    | sort key                     | word_data | created_at |
-| ---   | ---              | ---                          | ---       | ---        |
-| game  | game#{game_id}   | game#{timestamp}             | {word}    | iso8601    |
-| guess | game#{game_id}   | guess#{timestamp}#{letter}   | {letter}  | iso8601    |
+| key_name         | usage for game | usage for guess             | notes |
+| ---              | ---              | ---                       | ---   |
+| gameId           | {game_id}      | {game_id}                   | partition key |
+| sk               | game#{game_id} | guess#{timestamp}#{letter}  | sort key, for guesses the timestamp gives ordering and the letter avoids simultaneous submits colliding  |
+| word_data        | {word}         | {letter}                    |
+| guess_count_data | {max wrong guesses} | n/a |
+| created_at       | {created_at}   | {created_at} | iso8601 |
 
 A future extension would be to add a `ttl` column that's an int of (`created_at + delta`) which would auto delete old games [via a TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html). It's likely old games aren't useful after a couple hours (minutes?) and that'd save costs.
 

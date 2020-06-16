@@ -44,10 +44,10 @@ public class GamesController {
         public void setMaxWrongGuesses(Integer maxWrongGuesses) { this.maxWrongGuesses = maxWrongGuesses; }
     }
 
+    private static Logger LOG = LoggerFactory.getLogger(GamesController.class);
+
     @Autowired
     private GameInfoService gameInfoService;
-
-    private static Logger LOG = LoggerFactory.getLogger(GamesController.class);
 
     @Value("${games.defaultMaxWrongGuesses}")
     private int defaultMaxWrongGuesses;
@@ -71,9 +71,9 @@ public class GamesController {
                        "maxWrongGuesses", game.getMaxWrongGuesses())));
 
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
-                                             .path("/{id}") // TODO: full path?
+                                             .path("/{id}")
                                              .buildAndExpand(game.getId())
-                                              .toUri();
+                                             .toUri();
 
         return ResponseEntity.created(uri).body(Map.of("game", game));
     }
