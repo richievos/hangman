@@ -52,7 +52,8 @@ public class GameInfoServiceImpl implements GameInfoService {
         Item gameItem = new Item().withPrimaryKey("game_id", game.getId())
                                   .withInt("max_wrong_guesses", game.getMaxWrongGuesses())
                                   .withString("word_being_guessed", game.getWordBeingGuessed())
-                                  .with("created_at", new Date().getTime());
+                                  .with("created_at", new Date().getTime())
+                                  .withList("guesses", List.of());
         table.putItem(gameItem);
 
         return game;
@@ -61,13 +62,10 @@ public class GameInfoServiceImpl implements GameInfoService {
     public Game storeGuess(Game game, String letter) {
         Table table = getTable();
 
-        String attrName = guessAttributeName(new Date(), letter);
-
         UpdateItemSpec updateItemSpec =
             new UpdateItemSpec().withPrimaryKey("game_id", game.getId())
-                                .withUpdateExpression("SET #attrName = :letter")
-                                .withNameMap(Map.of("#attrName", attrName))
-                                .withValueMap(Map.of(":letter", letter))
+                                .withUpdateExpression("SET guesses = list_append(guesses, :letter)")
+                                .withValueMap(Map.of(":letter", List.of(letter)))
                                 .withReturnValues(ReturnValue.ALL_NEW);
         UpdateItemOutcome updateOutcome = table.updateItem(updateItemSpec);
 
@@ -97,15 +95,8 @@ public class GameInfoServiceImpl implements GameInfoService {
     private Game loadGame(String gameId, Item gameOutcome) {
         int maxWrongGuesses = gameOutcome.getInt("max_wrong_guesses");
         String wordBeingGuessed = gameOutcome.getString("word_being_guessed");
+        String[] guesses = gameOutcome.getList("guesses").toArray(new String[0]);
 
-        // grab all the attributes that are guesses
-        // sort them by their timestamp
-        // map them to their letter
-        String[] guesses = StreamSupport.stream(gameOutcome.attributes().spliterator(), false)
-                                .filter((entry) -> entry.getKey().startsWith(GUESS_KEY_PREFIX))
-                                .sorted((a, b) -> a.getKey().compareTo(b.getKey()))
-                                .map((entry) -> entry.getValue())
-                                .collect(Collectors.toList()).toArray(new String[0]);
         PlayState playState = PlayState.build(maxWrongGuesses, guesses, wordBeingGuessed);
 
         Game game = new Game(gameId,
@@ -114,9 +105,5 @@ public class GameInfoServiceImpl implements GameInfoService {
                              playState);
 
         return game;
-    }
-
-    private String guessAttributeName(Date date, String letter) {
-        return GUESS_KEY_PREFIX + "|" + Long.toString(date.getTime()) + "|" + letter;
     }
 }

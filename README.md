@@ -58,7 +58,7 @@ The Dynamodb data model implementing that follows. It stores a row for every sin
 | word_data        | {word}         | {letter}                    |
 | guess_count_data | {max wrong guesses} | n/a |
 | created_at       | {created_at}   | {created_at} | iso8601 |
-| guess\|{timestamp}\|{letter} | {letter} | every guess is stored as a separate attribute
+| guesses | [{letter}] | the guesses are stored as an array of strings in order of their receipt |
 
 A future extension would be to add a `ttl` column that's an int of (`created_at + delta`) which would auto delete old games [via a TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html). It's likely old games aren't useful after a couple hours (minutes?) and that'd save costs.
 
