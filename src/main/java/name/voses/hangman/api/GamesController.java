@@ -127,9 +127,8 @@ public class GamesController {
 
         // To avoid having to lock the game record (while still avoiding race conditions) this code:
         // 1. checks if the current guess is eligible to play at all, if not fail fast
-        // 2. stores the new guess
-        // 3. reloads the game and its guesses
-        // 4. returns the new state of the game
+        // 2. stores the new guess (which returns the state after update)
+        // 3. returns the new state of the game
         //
         // This avoids having to do any locks, but does mean the data loading logic needs to
         // account for duplicate guesses being registered and possibly more guesses having

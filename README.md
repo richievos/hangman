@@ -50,15 +50,15 @@ Game
         created_at
         letter
 
-The Dynamodb data model implementing that follows. It distributes the data using the random gameId across partitions. It keeps all the data for a given game on the same partition, so it can all be loaded at once. Following Dynanmo
+The Dynamodb data model implementing that follows. It stores a row for every single game, with the guesses as columns.
 
-| key_name         | usage for game | usage for guess             | notes |
+| key_name         | usage |
 | ---              | ---              | ---                       | ---   |
 | gameId           | {game_id}      | {game_id}                   | partition key |
-| sk               | game#{game_id} | guess#{timestamp}#{letter}  | sort key, for guesses the timestamp gives ordering and the letter avoids simultaneous submits colliding  |
 | word_data        | {word}         | {letter}                    |
 | guess_count_data | {max wrong guesses} | n/a |
 | created_at       | {created_at}   | {created_at} | iso8601 |
+| guess\|{timestamp}\|{letter} | {letter} | every guess is stored as a separate attribute
 
 A future extension would be to add a `ttl` column that's an int of (`created_at + delta`) which would auto delete old games [via a TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html). It's likely old games aren't useful after a couple hours (minutes?) and that'd save costs.
 

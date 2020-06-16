@@ -11,7 +11,7 @@ import name.voses.hangman.resources.Game;
 public interface GameInfoService {
     public Game createGame(int maxWrongGuesses);
 
-    public void storeGuess(Game game, String letter);
+    public Game storeGuess(Game game, String letter);
 
     public Game findGameWithGuesses(String gameId);
 }

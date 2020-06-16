@@ -12,11 +12,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import name.voses.hangman.persistence.GameInfoRepository;
+import name.voses.hangman.persistence.GameInfoServiceImpl;
 
 @Configuration
 @EnableDynamoDBRepositories(basePackages = "com.baeldung.spring.data.dynamodb.repositories",
-                            basePackageClasses = GameInfoRepository.class)
+                            basePackageClasses = GameInfoServiceImpl.class)
 public class DynamoDBConfig {
 
     @Value("${amazon.dynamodb.endpoint}")
