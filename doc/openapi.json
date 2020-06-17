@@ -11,6 +11,36 @@
     }
   ],
   "paths": {
+    "/games": {
+      "post": {
+        "tags": [
+          "games-controller"
+        ],
+        "description": "Start a new game",
+        "operationId": "createGame",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreateOptions"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New game created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/games/{gameId}": {
       "get": {
         "tags": [
@@ -29,6 +59,9 @@
           }
         ],
         "responses": {
+          "404": {
+            "description": "Game with given id not found"
+          },
           "200": {
             "description": "Game retrieved",
             "content": {
@@ -38,9 +71,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Game with given id not found"
           }
         }
       }
@@ -71,6 +101,9 @@
           }
         ],
         "responses": {
+          "404": {
+            "description": "Game with given id not found"
+          },
           "200": {
             "description": "Guess registered, returns the current (updated) state of the game. Idempotent on a re-guess of a letter.",
             "content": {
@@ -83,39 +116,6 @@
           },
           "400": {
             "description": "Game finished or invalid letter"
-          },
-          "404": {
-            "description": "Game with given id not found"
-          }
-        }
-      }
-    },
-    "/games": {
-      "post": {
-        "tags": [
-          "games-controller"
-        ],
-        "description": "Start a new game",
-        "operationId": "createGame",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GameCreateOptions"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "New game created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Game"
-                }
-              }
-            }
           }
         }
       }
@@ -123,6 +123,16 @@
   },
   "components": {
     "schemas": {
+      "GameCreateOptions": {
+        "type": "object",
+        "properties": {
+          "maxWrongGuesses": {
+            "type": "integer",
+            "description": "How many wrong guesses to allow",
+            "format": "int32"
+          }
+        }
+      },
       "Game": {
         "type": "object",
         "properties": {
@@ -180,16 +190,6 @@
           }
         },
         "description": "The state of the game being played including information about guesses"
-      },
-      "GameCreateOptions": {
-        "type": "object",
-        "properties": {
-          "maxWrongGuesses": {
-            "type": "integer",
-            "description": "How many wrong guesses to allow",
-            "format": "int32"
-          }
-        }
       }
     }
   }

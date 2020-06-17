@@ -40,6 +40,7 @@ Tracking that would add additional metadata to the letter tables in the data sto
 
 General data model:
 
+```
 Game
     id
     created_at
@@ -49,23 +50,24 @@ Game
     Guesses
         created_at
         letter
+```
 
-The Dynamodb data model implementing that follows. It stores a row for every single game, with the guesses as columns.
+The Dynamodb data model implementing that follows. It stores a row for every single game, with the guesses as a list.
 
-| key_name         | usage |
-| ---              | ---              | ---                       | ---   |
-| gameId           | {game_id}      | {game_id}                   | partition key |
-| word_data        | {word}         | {letter}                    |
-| guess_count_data | {max wrong guesses} | n/a |
-| created_at       | {created_at}   | {created_at} | iso8601 |
-| guesses | [{letter}] | the guesses are stored as an array of strings in order of their receipt |
+| key_name          | notes |
+| ---               | --- |
+| game_id           | partition key |
+| max_wrong_guesses |
+| word_being_guessed |
+| created_at       | ms since epoch |
+| guesses | [{letter}] the guesses are stored as an array of strings in order of their happening |
 
 A future extension would be to add a `ttl` column that's an int of (`created_at + delta`) which would auto delete old games [via a TTL](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html). It's likely old games aren't useful after a couple hours (minutes?) and that'd save costs.
 
 ## API Notes
 
 * when talking about characters, the API returns strings. JSON doesn't have a char type, so single length strings are returned. This also helps avoid unicode issues (some letters are multiple characters)
-* the masked words are an array of objects instead of just an array as an attempt to avoid having an array with a series of `null` characters in it. The client can can either key off of `.letter` being null or the entry not having the letter key. It also allows for future expansion of the API, such as tracking who guessed the given letter.
+* the masked words are an array of objects instead of just an array as an attempt to avoid having an array with a series of `null` characters in it. The client can key off of `.letter` being null. It also allows for future expansion of the API, such as tracking who guessed the given letter.
     * an alternative solution could return an array where null or "" represent placeholders and guessed characters are filled in.
     * an alternative solution could return a total length and positions of already guessed letters ({ pos: 0, letter: "G" }), but that would seemingly complicate the client side implementation.
     * an alternative solution could return the state of the letter explicitly (eg filled=true/false in or not)
@@ -73,7 +75,7 @@ A future extension would be to add a `ttl` column that's an int of (`created_at 
 
 
 ### API Docs
-The APIs are documented with OpenAPI/Swagger and accessible at `http://localhost:8080/v3/api-docs`. A dump of that is also checked in as doc/openapi.json.
+The APIs are documented with OpenAPI/Swagger and accessible at `http://localhost:8080/v3/api-docs`. A dump of that is also checked in as [doc/openapi.json](doc/openapi.json).
 
 It's suggested to view the API you copy-paste that openapi schema to https://editor.swagger.io/.
 
@@ -89,7 +91,7 @@ Dependencies:
 
 This app uses Dynamodb storage, so the easiest way to run it is boot the app and dependencies via `docker-compose`.
 
-```
+```bash
 # build the app
 $ mvn clean package
 
@@ -105,7 +107,7 @@ $ curl -i http://localhost:8080/v3/api-docs
 
 Running tests
 
-```
+```bash
 # build the app
 $ mvn clean package
 
@@ -114,4 +116,36 @@ $ docker-compose up dynamodb-test
 
 # hit the app (in a separate terminal)
 $ mvn test
+```
+
+## Example Normal Interaction
+
+```bash
+# Create a game (actual word in this example is "staff")
+$ curl -i -H "Content-Type: application/json" -X POST --data '{"maxWrongGuesses":5}' http://localhost:8080/games
+HTTP/1.1 201 Created
+Date: Wed, 17 Jun 2020 05:50:34 GMT
+Location: http://localhost:8080/games/5Yd0mITK0Y3k1aIaI6ODVZ
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+{"game":{"id":"5Yd0mITK0Y3k1aIaI6ODVZ","maxWrongGuesses":5,"playState":{"remainingWrongGuesses":5,"maskedWord":[{"letter":null},{"letter":null},{"letter":null},{"letter":null},{"letter":null}],"missedGuesses":[]},"wordLength":5}}
+
+# An incorrect guess
+$ curl -i -H "Content-Type: application/json" -X PUT http://localhost:8080/games/5Yd0mITK0Y3k1aIaI6ODVZ/guesses/p
+HTTP/1.1 200 OK
+Date: Wed, 17 Jun 2020 05:51:25 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+{"game":{"id":"5Yd0mITK0Y3k1aIaI6ODVZ","maxWrongGuesses":5,"playState":{"remainingWrongGuesses":4,"maskedWord":[{"letter":null},{"letter":null},{"letter":null},{"letter":null},{"letter":null}],"missedGuesses":[{"letter":"p"}]},"wordLength":5}}
+
+# A correct guess
+$ curl -i -H "Content-Type: application/json" -X PUT http://localhost:8080/games/5Yd0mITK0Y3k1aIaI6ODVZ/guesses/s
+HTTP/1.1 200 OK
+Date: Wed, 17 Jun 2020 05:52:37 GMT
+Content-Type: application/json
+Transfer-Encoding: chunked
+
+{"game":{"id":"5Yd0mITK0Y3k1aIaI6ODVZ","maxWrongGuesses":5,"playState":{"remainingWrongGuesses":4,"maskedWord":[{"letter":"s"},{"letter":null},{"letter":null},{"letter":null},{"letter":null}],"missedGuesses":[{"letter":"p"}]},"wordLength":5}}
 ```
